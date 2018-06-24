@@ -76,6 +76,8 @@ void *sbmalloc(struct sbmalloc_pool *p)
                 return NULL;
         }
 
+        /* Initialize the next free block if it was not
+         * initialized yet */
         if (p->num_initialized < p->num_blocks) {
                 unsigned int *el =
                         (unsigned int *) index_to_addr(p, p->num_initialized);
@@ -85,13 +87,18 @@ void *sbmalloc(struct sbmalloc_pool *p)
         void *ret = NULL;
 
         if (p->free_blocks > 0) {
+                /* Use current head of free blocks list */
                 ret = (void *) p->next_free;
                 --p->free_blocks;
 
                 if (p->free_blocks != 0) {
+                        /* Shift the head of free blocks list to the next
+                         * available block, index of which is written in
+                         * current free block */
                         p->next_free = (unsigned char *)
                                 index_to_addr(p, *((size_t *) p->next_free));
                 } else {
+                        /* No free blocks left, delete head */
                         p->next_free = NULL;
                 }
         }
@@ -116,10 +123,11 @@ int sbfree(struct sbmalloc_pool *p, void *ptr)
         assert_this_pool(p, ptr);
 
         if (p->next_free != NULL) {
+                /* Append current block to free blocks list head */
                 *((size_t *) ptr) = addr_to_index(p, p->next_free);
                 p->next_free = (unsigned char *) ptr;
         } else {
-                *((size_t *) ptr) = p->num_blocks;
+                /* Restore the head of free blocks list */
                 p->next_free = (unsigned char *) ptr;
         }
 
